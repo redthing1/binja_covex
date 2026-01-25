@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/covex">
+    <file>icons/blend.svg</file>
+  </qresource>
+</RCC>
