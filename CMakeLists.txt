@@ -48,8 +48,12 @@ add_library(covex_ui SHARED
     src/covex/ui/settings/covex_settings.cpp
     src/covex/ui/controllers/workspace_controller.cpp
     src/covex/ui/painting/coverage_painter.cpp
+    src/covex/ui/models/trace_table_model.cpp
+    src/covex/ui/models/block_table_model.cpp
     src/covex/core/coverage_mapper.cpp
+    src/covex/core/block_filter.cpp
     src/covex/core/module_matcher.cpp
+    src/covex/coverage/coverage_expression.cpp
     src/covex/coverage/coverage_dataset.cpp
     src/covex/coverage/coverage_operations.cpp
     src/covex/coverage/coverage_store.cpp

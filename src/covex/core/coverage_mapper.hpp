@@ -17,6 +17,7 @@ struct CoveredBlock {
   uint32_t size = 0;
   uint64_t hits = 0;
   std::optional<uint32_t> module_id;
+  std::string function;
 };
 
 struct MapDiagnostics {

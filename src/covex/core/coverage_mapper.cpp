@@ -147,10 +147,20 @@ std::vector<CoveredBlock> CoverageMapper::derive_blocks_from_hits(
         continue;
       }
       const uint64_t start = block->GetStart();
-      auto &entry = blocks[start];
-      if (entry.start == 0) {
+      auto [it, inserted] = blocks.emplace(start, CoveredBlock{});
+      auto &entry = it->second;
+      if (inserted) {
         entry.start = start;
         entry.size = static_cast<uint32_t>(block->GetLength());
+        if (auto func = block->GetFunction()) {
+          if (auto sym = func->GetSymbol()) {
+            auto name = sym->GetShortName();
+            if (name.empty()) {
+              name = sym->GetFullName();
+            }
+            entry.function = std::move(name);
+          }
+        }
       }
       entry.hits += count;
     }
