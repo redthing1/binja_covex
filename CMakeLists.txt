@@ -49,6 +49,7 @@ add_library(covex_ui SHARED
     src/covex/ui/controllers/workspace_controller.cpp
     src/covex/ui/painting/coverage_painter.cpp
     src/covex/core/coverage_mapper.cpp
+    src/covex/core/module_matcher.cpp
     src/covex/coverage/coverage_dataset.cpp
     src/covex/coverage/coverage_operations.cpp
     src/covex/coverage/coverage_store.cpp

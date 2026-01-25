@@ -51,7 +51,6 @@ private:
   derive_blocks_from_hits(const coverage::CoverageDataset::HitMap &hits,
                           BinaryViewRef view);
   static bool is_address_in_view(BinaryViewRef view, uint64_t addr);
-  static bool has_function(BinaryViewRef view, uint64_t addr);
   static uint64_t instruction_length(BinaryViewRef view, uint64_t addr,
                                      uint64_t remaining);
 };
