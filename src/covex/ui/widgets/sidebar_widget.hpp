@@ -1,7 +1,8 @@
 #pragma once
 
-#include <QLabel>
+#include <QToolButton>
 #include <QWidget>
+#include <memory>
 
 #include "binaryninjaapi.h"
 #include "sidebarwidget.h"
@@ -9,24 +10,30 @@
 
 namespace binja::covex::ui {
 
+class CoverageWorkspaceController;
+
 class CovexSidebarWidget final : public SidebarWidget {
 public:
   CovexSidebarWidget(const QString &name, ViewFrame *frame, BinaryViewRef data);
   ~CovexSidebarWidget() override;
 
   QWidget *widget();
+  bool request_load();
+  void request_clear();
   void notifyThemeChanged() override;
   void notifyFontChanged() override;
   void notifyViewChanged(ViewFrame *frame) override;
 
 private:
   void build_ui();
+  void connect_signals();
   void apply_theme();
 
   BinaryViewRef m_data;
   ViewFrame *m_frame = nullptr;
-  QLabel *m_title = nullptr;
-  QLabel *m_status = nullptr;
+  QToolButton *m_load_button = nullptr;
+  QToolButton *m_clear_button = nullptr;
+  std::unique_ptr<CoverageWorkspaceController> m_controller;
 };
 
 class CovexSidebarWidgetType final : public SidebarWidgetType {

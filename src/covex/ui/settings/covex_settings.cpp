@@ -15,7 +15,7 @@ namespace binja::covex::ui {
 
 void register_settings() {
   auto settings = BinaryNinja::Settings::Instance();
-  settings->RegisterGroup(kSettingsGroup, "Covex");
+  settings->RegisterGroup(kSettingsGroup, "CovEx");
   settings->RegisterSetting(kDefaultHighlightColorKey,
                             R"json({
       "title" : "Default Highlight Color",

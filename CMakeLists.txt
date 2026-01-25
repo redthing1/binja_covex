@@ -46,6 +46,14 @@ add_library(covex_ui SHARED
     src/covex/ui/widgets/sidebar_widget.cpp
     src/covex/ui/theme/icon_loader.cpp
     src/covex/ui/settings/covex_settings.cpp
+    src/covex/ui/controllers/workspace_controller.cpp
+    src/covex/ui/painting/coverage_painter.cpp
+    src/covex/core/coverage_mapper.cpp
+    src/covex/coverage/coverage_dataset.cpp
+    src/covex/coverage/coverage_operations.cpp
+    src/covex/coverage/coverage_store.cpp
+    src/covex/coverage/coverage_parser.cpp
+    src/covex/coverage/drcov_reader.cpp
     resources/covex_icons.qrc
 )
 
