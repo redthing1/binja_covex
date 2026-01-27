@@ -8,6 +8,14 @@ constexpr const char *kHeatmapPercentileKey = "covex.heatmapPercentileCap";
 constexpr const char *kHeatmapLogScaleKey = "covex.heatmapLogScale";
 constexpr const char *kHighlightAlphaKey = "covex.highlightAlpha";
 constexpr const char *kHighlightGranularityKey = "covex.highlightGranularity";
+constexpr const char *kDiscoveryRequireCodeSectionKey =
+    "covex.discovery.requireCodeSection";
+constexpr const char *kDiscoveryBackscanBytesKey =
+    "covex.discovery.backwardScanBytes";
+constexpr const char *kDiscoveryUpdateAnalysisKey =
+    "covex.discovery.updateAnalysisPerFunction";
+constexpr const char *kDiscoveryRequireSegmentCodeFlagKey =
+    "covex.discovery.requireSegmentCodeFlag";
 
 } // namespace
 
@@ -58,6 +66,36 @@ void register_settings() {
       "description" : "Default highlight granularity.",
       "enum" : ["instruction", "basic_block"],
       "enumDescriptions" : ["Instruction", "Basic Block"]
+    })json");
+  settings->RegisterSetting(kDiscoveryRequireCodeSectionKey,
+                            R"json({
+      "title" : "Discovery Require Code Section",
+      "type" : "boolean",
+      "default" : false,
+      "description" : "Require ReadOnlyCode section semantics when defining functions from coverage."
+    })json");
+  settings->RegisterSetting(kDiscoveryBackscanBytesKey,
+                            R"json({
+      "title" : "Discovery Backward Scan Bytes",
+      "type" : "number",
+      "default" : 0,
+      "description" : "Maximum bytes to scan backwards when choosing coverage-based function entrypoints.",
+      "min" : 0,
+      "max" : 256
+    })json");
+  settings->RegisterSetting(kDiscoveryUpdateAnalysisKey,
+                            R"json({
+      "title" : "Discovery Update Analysis Per Function",
+      "type" : "boolean",
+      "default" : true,
+      "description" : "Run UpdateAnalysisAndWait after each function definition."
+    })json");
+  settings->RegisterSetting(kDiscoveryRequireSegmentCodeFlagKey,
+                            R"json({
+      "title" : "Discovery Require Segment Code Flag",
+      "type" : "boolean",
+      "default" : false,
+      "description" : "Require SegmentContainsCode in addition to SegmentExecutable."
     })json");
 }
 

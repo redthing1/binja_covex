@@ -1,9 +1,11 @@
 #include "covex/ui/controllers/workspace_controller.hpp"
 
 #include <exception>
+#include <sstream>
 #include <thread>
 
 #include "binaryninjaapi.h"
+#include "covex/core/coverage_discovery.hpp"
 #include "covex/core/logging.hpp"
 
 namespace binja::covex::ui {
@@ -35,6 +37,41 @@ std::string make_alias(size_t index) {
   return alias;
 }
 
+core::CoverageDiscoverySettings
+load_discovery_settings(const BinaryViewRef &view) {
+  core::CoverageDiscoverySettings settings;
+  auto bn_settings = BinaryNinja::Settings::Instance();
+  settings.backward_scan_bytes = static_cast<uint64_t>(
+      bn_settings->Get<uint64_t>("covex.discovery.backwardScanBytes", view));
+  settings.require_code_section =
+      bn_settings->Get<bool>("covex.discovery.requireCodeSection", view);
+  settings.require_segment_code_flag =
+      bn_settings->Get<bool>("covex.discovery.requireSegmentCodeFlag", view);
+  settings.update_analysis_per_function =
+      bn_settings->Get<bool>("covex.discovery.updateAnalysisPerFunction", view);
+  return settings;
+}
+
+std::string format_discovery_report(const core::DiscoveryReport &report) {
+  std::ostringstream out;
+  out << "Function discovery candidates=" << report.candidates
+      << " created=" << report.created;
+  if (!report.skipped.empty()) {
+    out << " skipped={";
+    bool first = true;
+    for (const auto &entry : report.skipped) {
+      if (!first) {
+        out << ", ";
+      }
+      first = false;
+      out << core::discovery_skip_reason_label(entry.first) << "="
+          << entry.second;
+    }
+    out << "}";
+  }
+  return out.str();
+}
+
 } // namespace
 
 CoverageWorkspaceController::CoverageWorkspaceController(
@@ -44,6 +81,8 @@ CoverageWorkspaceController::CoverageWorkspaceController(
   state_->controller = this;
   register_controller(view_.GetPtr(), this);
   parser_registry_.register_parser(std::make_unique<coverage::DrcovParser>());
+  parser_registry_.register_parser(
+      std::make_unique<coverage::AddrTraceParser>());
   painter_ = std::make_unique<CoveragePainter>(view_);
   logger_ = log::logger(view_, log::kLogger);
 }
@@ -103,7 +142,8 @@ bool CoverageWorkspaceController::prompt_load() {
     return false;
   }
   std::string path;
-  const std::string filter = "Coverage Files (*.drcov *.cov);;All Files (*)";
+  const std::string filter =
+      "Coverage Files (*.drcov *.cov *.txt *.addr *.hits);;All Files (*)";
   if (!BinaryNinja::GetOpenFileNameInput(path, "Open coverage file", filter)) {
     return false;
   }
@@ -159,20 +199,17 @@ bool CoverageWorkspaceController::load_trace_file(const std::string &path) {
     }
 
     task->SetProgressText("CovEx: Mapping coverage...");
-    auto result = mapper->map_trace(trace, view);
+    auto index = mapper->map_trace(trace, view);
 
     TraceRecord record;
     record.id = 0;
     record.alias.clear();
     record.trace = std::move(trace);
-    record.dataset = std::move(result.dataset);
-    record.blocks = std::move(result.blocks);
-    record.invalid_addresses = std::move(result.invalid_addresses);
-    record.diagnostics = std::move(result.diagnostics);
-    record.stats = record.dataset.stats();
+    record.index = std::move(index);
+    record.stats = record.index.dataset.stats();
 
     if (logger) {
-      const auto &diag = record.diagnostics;
+      const auto &diag = record.index.diagnostics;
       if (diag.matched_module_id) {
         const std::string reason =
             diag.match_reason.empty() ? "unknown" : diag.match_reason;
@@ -193,7 +230,7 @@ bool CoverageWorkspaceController::load_trace_file(const std::string &path) {
       }
       logger->LogInfoF("Mapped spans: total={} mapped={} skipped={} invalid={}",
                        diag.spans_total, diag.spans_mapped, diag.spans_skipped,
-                       record.invalid_addresses.size());
+                       record.index.invalid_addresses.size());
       logger->LogInfoF("Mapped addresses: unique={} total={}",
                        record.stats.unique_addresses, record.stats.total_hits);
     }
@@ -252,19 +289,17 @@ void CoverageWorkspaceController::set_expression(
   if (expression.empty()) {
     view_ui_->clear_expression_error();
     if (traces_.empty()) {
-      active_dataset_.reset();
-      active_blocks_.clear();
+      active_index_.reset();
       if (painter_) {
         painter_->clear();
       }
-      update_blocks_view(active_blocks_);
+      update_blocks_view({});
       return;
     }
     if (!traces_.empty()) {
-      active_dataset_ = traces_.front().dataset;
-      active_blocks_ = traces_.front().blocks;
+      active_index_ = traces_.front().index;
       apply_active_highlights();
-      update_blocks_view(active_blocks_);
+      update_blocks_view(active_index_->blocks);
     }
     return;
   }
@@ -285,7 +320,7 @@ void CoverageWorkspaceController::set_expression(
   std::unordered_map<std::string, coverage::CoverageDataset> datasets;
   datasets.reserve(traces_.size());
   for (const auto &trace : traces_) {
-    datasets.emplace(trace.alias, trace.dataset);
+    datasets.emplace(trace.alias, trace.index.dataset);
   }
 
   compose_expression_async(generation, std::move(plan), std::move(datasets));
@@ -327,10 +362,9 @@ void CoverageWorkspaceController::compose_expression_async(
 
     task->SetProgressText("CovEx: Mapping composition...");
     auto dataset = std::get<coverage::CoverageDataset>(std::move(composed));
-    auto result = mapper->map_dataset(dataset, view);
+    auto index = mapper->map_dataset(dataset, view);
     CompositionResult composed_result;
-    composed_result.dataset = std::move(result.dataset);
-    composed_result.blocks = std::move(result.blocks);
+    composed_result.index = std::move(index);
 
     task->Finish();
 
@@ -343,10 +377,9 @@ void CoverageWorkspaceController::compose_expression_async(
           if (controller.view_ui_) {
             controller.view_ui_->clear_expression_error();
           }
-          controller.active_dataset_ = std::move(composed_result.dataset);
-          controller.active_blocks_ = std::move(composed_result.blocks);
+          controller.active_index_ = std::move(composed_result.index);
           controller.apply_active_highlights();
-          controller.update_blocks_view(controller.active_blocks_);
+          controller.update_blocks_view(controller.active_index_->blocks);
         });
   }).detach();
 }
@@ -355,12 +388,12 @@ void CoverageWorkspaceController::set_block_filter(
     const std::string &filter_text) {
   block_filter_ = filter_text;
   const auto generation = filter_generation_.fetch_add(1) + 1;
-  if (active_blocks_.empty()) {
-    update_blocks_view(active_blocks_);
+  if (!active_index_ || active_index_->blocks.empty()) {
+    update_blocks_view({});
     return;
   }
   if (filter_text.empty()) {
-    update_blocks_view(active_blocks_);
+    update_blocks_view(active_index_->blocks);
     return;
   }
   auto parsed = core::parse_block_filter(filter_text);
@@ -374,8 +407,8 @@ void CoverageWorkspaceController::set_block_filter(
 
   auto filter = std::get<core::BlockFilter>(std::move(parsed));
   std::vector<BlockSummary> summaries;
-  summaries.reserve(active_blocks_.size());
-  for (const auto &block : active_blocks_) {
+  summaries.reserve(active_index_->blocks.size());
+  for (const auto &block : active_index_->blocks) {
     BlockSummary summary;
     summary.address = block.start;
     summary.size = block.size;
@@ -404,6 +437,57 @@ void CoverageWorkspaceController::set_heatmap_settings(
   if (highlight_mode_ == HighlightMode::Heatmap) {
     apply_active_highlights();
   }
+}
+
+bool CoverageWorkspaceController::request_define_functions_from_coverage() {
+  if (!view_) {
+    return false;
+  }
+  if (!active_index_) {
+    if (logger_) {
+      logger_->LogWarn(
+          "CovEx: no active coverage dataset; load coverage first");
+    }
+    return false;
+  }
+
+  const auto settings = load_discovery_settings(view_);
+  auto index = *active_index_;
+  auto view = view_;
+  auto logger = logger_;
+  auto *mapper = &mapper_;
+  auto state = state_;
+
+  BinaryNinja::Ref<BinaryNinja::BackgroundTask> task =
+      new BinaryNinja::BackgroundTask("CovEx: Discovery 1/3 Plan", false);
+
+  std::thread([state, task, view, logger, mapper, settings,
+               index = std::move(index)]() mutable {
+    task->SetProgressText("CovEx: Discovery 1/3 Plan");
+    auto plan = core::BuildDiscoveryPlan(index, view, settings);
+
+    task->SetProgressText("CovEx: Discovery 2/3 Define");
+    auto report = core::ExecuteDiscoveryPlan(plan, view, settings);
+
+    task->SetProgressText("CovEx: Discovery 3/3 Remap");
+    auto remapped = mapper->map_dataset(index.dataset, view);
+
+    task->Finish();
+    std::string message = format_discovery_report(report);
+
+    dispatch_ui(
+        state, [remapped = std::move(remapped), message = std::move(message)](
+                   CoverageWorkspaceController &controller) mutable {
+          controller.active_index_ = std::move(remapped);
+          controller.apply_active_highlights();
+          controller.update_blocks_view(controller.active_index_->blocks);
+          if (controller.logger_) {
+            controller.logger_->LogInfoF("{}", message);
+          }
+        });
+  }).detach();
+
+  return true;
 }
 
 void CoverageWorkspaceController::filter_blocks_async(
@@ -461,14 +545,14 @@ void CoverageWorkspaceController::update_blocks_view(
 }
 
 void CoverageWorkspaceController::apply_active_highlights() {
-  if (!painter_ || !active_dataset_) {
+  if (!painter_ || !active_index_) {
     return;
   }
   if (highlight_mode_ == HighlightMode::Heatmap) {
-    painter_->apply_heatmap(*active_dataset_, highlight_granularity_,
+    painter_->apply_heatmap(active_index_->dataset, highlight_granularity_,
                             heatmap_settings_);
   } else {
-    painter_->apply_plain(*active_dataset_, highlight_granularity_);
+    painter_->apply_plain(active_index_->dataset, highlight_granularity_);
   }
 }
 

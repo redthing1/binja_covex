@@ -10,7 +10,9 @@
 
 #include "binaryninjaapi.h"
 #include "covex/core/block_filter.hpp"
+#include "covex/core/coverage_index.hpp"
 #include "covex/core/coverage_mapper.hpp"
+#include "covex/coverage/addr_trace_reader.hpp"
 #include "covex/coverage/coverage_expression.hpp"
 #include "covex/coverage/coverage_parser.hpp"
 #include "covex/coverage/drcov_reader.hpp"
@@ -62,10 +64,7 @@ public:
   void set_highlight_mode(HighlightMode mode);
   void set_granularity(HighlightGranularity granularity);
   void set_heatmap_settings(const HeatmapSettings &settings);
-
-  const std::optional<coverage::CoverageDataset> &active_dataset() const {
-    return active_dataset_;
-  }
+  bool request_define_functions_from_coverage();
 
   static CoverageWorkspaceController *find(BinaryNinja::BinaryView *view);
   static void register_controller(BinaryNinja::BinaryView *view,
@@ -83,16 +82,12 @@ private:
     uint64_t id = 0;
     std::string alias;
     coverage::CoverageTrace trace;
-    coverage::CoverageDataset dataset;
-    std::vector<core::CoveredBlock> blocks;
-    std::vector<uint64_t> invalid_addresses;
-    core::MapDiagnostics diagnostics;
+    core::CoverageIndex index;
     coverage::CoverageStats stats;
   };
 
   struct CompositionResult {
-    coverage::CoverageDataset dataset;
-    std::vector<core::CoveredBlock> blocks;
+    core::CoverageIndex index;
   };
 
   BinaryViewRef view_;
@@ -102,8 +97,7 @@ private:
   core::CoverageMapper mapper_;
   std::unique_ptr<CoveragePainter> painter_;
   std::vector<TraceRecord> traces_;
-  std::optional<coverage::CoverageDataset> active_dataset_;
-  std::vector<core::CoveredBlock> active_blocks_;
+  std::optional<core::CoverageIndex> active_index_;
   std::atomic<uint64_t> compose_generation_{0};
   std::atomic<uint64_t> filter_generation_{0};
   uint64_t next_trace_id_ = 1;

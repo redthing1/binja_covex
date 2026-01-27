@@ -38,11 +38,11 @@ uint64_t CoverageMapper::instruction_length(BinaryViewRef view, uint64_t addr,
   return length;
 }
 
-MapResult CoverageMapper::map_trace(const coverage::CoverageTrace &trace,
-                                    BinaryViewRef view) {
+CoverageIndex CoverageMapper::map_trace(const coverage::CoverageTrace &trace,
+                                        BinaryViewRef view) {
   coverage::CoverageDataset::HitMap hits;
   std::unordered_set<uint64_t> invalid;
-  MapResult result;
+  CoverageIndex result;
   result.diagnostics.spans_total = trace.spans.size();
 
   const auto match = ModuleMatcher::match(trace, view);
@@ -100,18 +100,21 @@ MapResult CoverageMapper::map_trace(const coverage::CoverageTrace &trace,
     }
   }
 
-  coverage::CoverageDataset dataset =
-      coverage::CoverageDataset::from_hits(std::move(hits));
-  auto blocks = derive_blocks_from_hits(dataset.hits(), view);
-
-  result.dataset = std::move(dataset);
-  result.blocks = std::move(blocks);
+  result.dataset = coverage::CoverageDataset::from_hits(std::move(hits));
+  result.blocks = derive_blocks_from_hits(result.dataset.hits(), view);
+  result.hit_addresses_sorted.reserve(result.dataset.hits().size());
+  for (const auto &entry : result.dataset.hits()) {
+    result.hit_addresses_sorted.push_back(entry.first);
+  }
+  std::sort(result.hit_addresses_sorted.begin(),
+            result.hit_addresses_sorted.end());
   result.invalid_addresses.assign(invalid.begin(), invalid.end());
   return result;
 }
 
-MapResult CoverageMapper::map_dataset(const coverage::CoverageDataset &dataset,
-                                      BinaryViewRef view) {
+CoverageIndex
+CoverageMapper::map_dataset(const coverage::CoverageDataset &dataset,
+                            BinaryViewRef view) {
   coverage::CoverageDataset::HitMap hits;
   std::unordered_set<uint64_t> invalid;
 
@@ -123,13 +126,15 @@ MapResult CoverageMapper::map_dataset(const coverage::CoverageDataset &dataset,
     hits.emplace(addr, count);
   }
 
-  coverage::CoverageDataset mapped =
-      coverage::CoverageDataset::from_hits(std::move(hits));
-  auto blocks = derive_blocks_from_hits(mapped.hits(), view);
-
-  MapResult result;
-  result.dataset = std::move(mapped);
-  result.blocks = std::move(blocks);
+  CoverageIndex result;
+  result.dataset = coverage::CoverageDataset::from_hits(std::move(hits));
+  result.blocks = derive_blocks_from_hits(result.dataset.hits(), view);
+  result.hit_addresses_sorted.reserve(result.dataset.hits().size());
+  for (const auto &entry : result.dataset.hits()) {
+    result.hit_addresses_sorted.push_back(entry.first);
+  }
+  std::sort(result.hit_addresses_sorted.begin(),
+            result.hit_addresses_sorted.end());
   result.invalid_addresses.assign(invalid.begin(), invalid.end());
   return result;
 }

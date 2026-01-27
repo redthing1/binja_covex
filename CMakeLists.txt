@@ -50,6 +50,7 @@ add_library(covex_ui SHARED
     src/covex/ui/painting/coverage_painter.cpp
     src/covex/ui/models/trace_table_model.cpp
     src/covex/ui/models/block_table_model.cpp
+    src/covex/core/coverage_discovery.cpp
     src/covex/core/coverage_mapper.cpp
     src/covex/core/block_filter.cpp
     src/covex/core/module_matcher.cpp
@@ -59,6 +60,7 @@ add_library(covex_ui SHARED
     src/covex/coverage/coverage_store.cpp
     src/covex/coverage/coverage_parser.cpp
     src/covex/coverage/drcov_reader.cpp
+    src/covex/coverage/addr_trace_reader.cpp
     resources/covex_icons.qrc
 )
 

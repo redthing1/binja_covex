@@ -21,6 +21,11 @@ on macos, auto-configure:
 
 load coverage via the CovEx sidebar or `Plugins > CovEx > Load Coverage`.
 
+### coverage formats
+
+- `drcov` / `drcov-hits`
+- address list (optional hitcount)
+
 ### composition expressions
 
 traces are assigned aliases A, B, C, ...

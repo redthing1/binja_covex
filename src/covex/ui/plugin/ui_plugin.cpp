@@ -55,6 +55,32 @@ BINARYNINJAPLUGIN bool UIPluginInit() {
         }
       },
       [](BinaryView *view) { return view != nullptr; });
+  PluginCommand::Register(
+      "CovEx\\Function Discovery",
+      "Discover functions from CovEx coverage hits",
+      [](BinaryView *view) {
+        Sidebar *sidebar = Sidebar::current();
+        if (!sidebar) {
+          return;
+        }
+        sidebar->activate("CovEx");
+        QWidget *raw_widget = sidebar->widget("CovEx");
+        auto *widget =
+            dynamic_cast<binja::covex::ui::CovexSidebarWidget *>(raw_widget);
+        if (widget) {
+          auto *controller =
+              binja::covex::ui::CoverageWorkspaceController::find(view);
+          if (controller) {
+            controller->request_define_functions_from_coverage();
+          }
+          return;
+        }
+        if (auto logger =
+                binja::covex::log::logger(view, binja::covex::log::kLogger)) {
+          logger->LogWarn("CovEx sidebar unavailable for define functions");
+        }
+      },
+      [](BinaryView *view) { return view != nullptr; });
   Sidebar::addSidebarWidgetType(new binja::covex::ui::CovexSidebarWidgetType());
   return true;
 }
