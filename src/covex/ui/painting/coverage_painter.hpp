@@ -48,6 +48,11 @@ private:
                                  const HeatmapSettings &settings);
   void apply_heatmap_block(const coverage::CoverageDataset &dataset,
                            const HeatmapSettings &settings);
+  void highlight_block_instructions(const BasicBlockRef &block,
+                                    BNHighlightStandardColor color,
+                                    uint8_t alpha = 255);
+  void highlight_block_instructions_rgb(const BasicBlockRef &block, uint8_t r,
+                                        uint8_t g, uint8_t b, uint8_t alpha);
 
   BinaryViewRef view_;
   std::vector<InstructionHighlight> instruction_highlights_;

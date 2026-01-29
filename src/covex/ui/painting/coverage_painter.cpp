@@ -7,6 +7,8 @@ namespace binja::covex::ui {
 
 namespace {
 
+constexpr uint64_t kMaxInstructionLength = 16;
+
 std::vector<uint64_t>
 collect_hitcounts(const coverage::CoverageDataset &dataset) {
   std::vector<uint64_t> counts;
@@ -64,6 +66,21 @@ uint64_t percentile_cap_value(std::vector<uint64_t> &counts,
     idx = counts.size() - 1;
   }
   return counts[idx];
+}
+
+uint64_t instruction_length(BinaryViewRef view, ArchitectureRef arch,
+                            uint64_t addr, uint64_t remaining) {
+  if (!view || !arch) {
+    return 1;
+  }
+  uint64_t length = view->GetInstructionLength(arch, addr);
+  if (length == 0 || length > kMaxInstructionLength) {
+    length = 1;
+  }
+  if (remaining > 0 && length > remaining) {
+    length = remaining;
+  }
+  return length;
 }
 
 } // namespace
@@ -170,6 +187,7 @@ void CoveragePainter::apply_plain_block(
       }
       block->SetAutoBasicBlockHighlight(OrangeHighlightColor);
       block_highlights_.push_back({block});
+      highlight_block_instructions(block, OrangeHighlightColor);
     }
   }
 }
@@ -244,7 +262,66 @@ void CoveragePainter::apply_heatmap_block(
       block->SetAutoBasicBlockHighlight(color.red, color.green, color.blue,
                                         settings.alpha);
       block_highlights_.push_back({block});
+      highlight_block_instructions_rgb(block, color.red, color.green,
+                                       color.blue, settings.alpha);
     }
+  }
+}
+
+void CoveragePainter::highlight_block_instructions(
+    const BasicBlockRef &block, BNHighlightStandardColor color, uint8_t alpha) {
+  if (!view_ || !block) {
+    return;
+  }
+  auto func = block->GetFunction();
+  if (!func) {
+    return;
+  }
+  auto arch = block->GetArchitecture();
+  if (!arch) {
+    arch = view_->GetDefaultArchitecture();
+  }
+  const uint64_t start = block->GetStart();
+  const uint64_t length = block->GetLength();
+  if (length == 0) {
+    return;
+  }
+  uint64_t addr = start;
+  const uint64_t end = start + length;
+  while (addr < end) {
+    func->SetAutoInstructionHighlight(arch, addr, color, alpha);
+    instruction_highlights_.push_back({func, addr});
+    const uint64_t remaining = end - addr;
+    addr += instruction_length(view_, arch, addr, remaining);
+  }
+}
+
+void CoveragePainter::highlight_block_instructions_rgb(
+    const BasicBlockRef &block, uint8_t r, uint8_t g, uint8_t b,
+    uint8_t alpha) {
+  if (!view_ || !block) {
+    return;
+  }
+  auto func = block->GetFunction();
+  if (!func) {
+    return;
+  }
+  auto arch = block->GetArchitecture();
+  if (!arch) {
+    arch = view_->GetDefaultArchitecture();
+  }
+  const uint64_t start = block->GetStart();
+  const uint64_t length = block->GetLength();
+  if (length == 0) {
+    return;
+  }
+  uint64_t addr = start;
+  const uint64_t end = start + length;
+  while (addr < end) {
+    func->SetAutoInstructionHighlight(arch, addr, r, g, b, alpha);
+    instruction_highlights_.push_back({func, addr});
+    const uint64_t remaining = end - addr;
+    addr += instruction_length(view_, arch, addr, remaining);
   }
 }
 
